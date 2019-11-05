@@ -44,6 +44,8 @@
 
 #include <contracts.hpp>
 
+#include <eosio/testing/z_hglog.hpp>
+
 #define DUMMY_ACTION_DEFAULT_A 0x45
 #define DUMMY_ACTION_DEFAULT_B 0xab11cd1244556677
 #define DUMMY_ACTION_DEFAULT_C 0x7451ae12
@@ -320,11 +322,17 @@ struct MySink : public bio::sink
 };
 uint32_t last_fnc_err = 0;
 
+
 BOOST_FIXTURE_TEST_CASE(action_receipt_tests, TESTER) { try {
    produce_blocks(2);
    create_account( N(test) );
    set_code( N(test), contracts::payloadless_wasm() );
-   produce_blocks(1);
+   set_fee( N(eosio), N(reqauth), asset{10000});
+   set_fee( N(eosio), N(doit), asset{10000});
+   set_fee( N(eosio), N(provereset), asset{10000});
+   set_fee( N(test), N(doit), asset{10000});
+   set_fee( N(test), N(provereset), asset{10000});
+   produce_blocks(10);
 
    auto call_doit_and_check = [&]( account_name contract, account_name signer, auto&& checker ) {
       signed_transaction trx;
@@ -346,25 +354,28 @@ BOOST_FIXTURE_TEST_CASE(action_receipt_tests, TESTER) { try {
 
    auto result = push_reqauth( config::system_account_name, "active" );
    BOOST_REQUIRE_EQUAL( result->receipt->status, transaction_receipt::executed );
-   BOOST_REQUIRE( result->action_traces[0].receipt->auth_sequence.find( config::system_account_name )
-                     != result->action_traces[0].receipt->auth_sequence.end() );
-   auto base_global_sequence_num = result->action_traces[0].receipt->global_sequence;
-   auto base_system_recv_seq_num = result->action_traces[0].receipt->recv_sequence;
-   auto base_system_auth_seq_num = result->action_traces[0].receipt->auth_sequence[config::system_account_name];
-   auto base_system_code_seq_num = result->action_traces[0].receipt->code_sequence.value;
-   auto base_system_abi_seq_num  = result->action_traces[0].receipt->abi_sequence.value;
+   BOOST_REQUIRE( result->action_traces[1].receipt->auth_sequence.find( config::system_account_name )
+                     != result->action_traces[1].receipt->auth_sequence.end() );
+   auto base_global_sequence_num = result->action_traces[1].receipt->global_sequence;
+   auto base_system_recv_seq_num = result->action_traces[1].receipt->recv_sequence;
+   auto base_system_auth_seq_num = result->action_traces[1].receipt->auth_sequence[config::system_account_name];
+   auto base_system_code_seq_num = result->action_traces[1].receipt->code_sequence.value;
+   auto base_system_abi_seq_num  = result->action_traces[1].receipt->abi_sequence.value;
 
    uint64_t base_test_recv_seq_num = 0;
    uint64_t base_test_auth_seq_num = 0;
    call_doit_and_check( N(test), N(test), [&]( const transaction_trace_ptr& res ) {
       BOOST_CHECK_EQUAL( res->receipt->status, transaction_receipt::executed );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->global_sequence, base_global_sequence_num + 1 );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->code_sequence.value, 1 );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->abi_sequence.value, 0 );
-      base_test_recv_seq_num = res->action_traces[0].receipt->recv_sequence;
+      // in eosforce, there is an onfee action in block interval
+      // reqauth + onfee = 2
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->global_sequence, base_global_sequence_num + 2 );
+      // in eosforce, we call more set_code and set_abi func than eosio
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->code_sequence.value, 1 );
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->abi_sequence.value, 0 );
+      base_test_recv_seq_num = res->action_traces[1].receipt->recv_sequence;
       BOOST_CHECK( base_test_recv_seq_num > 0 );
       base_test_recv_seq_num--;
-      const auto& m = res->action_traces[0].receipt->auth_sequence;
+      const auto& m = res->action_traces[1].receipt->auth_sequence;
       BOOST_CHECK_EQUAL( m.size(), 1 );
       BOOST_CHECK_EQUAL( m.begin()->first.to_string(), "test" );
       base_test_auth_seq_num = m.begin()->second;
@@ -377,14 +388,15 @@ BOOST_FIXTURE_TEST_CASE(action_receipt_tests, TESTER) { try {
 
    call_provereset_and_check( N(test), N(test), [&]( const transaction_trace_ptr& res ) {
       BOOST_CHECK_EQUAL( res->receipt->status, transaction_receipt::executed );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->global_sequence, base_global_sequence_num + 4 );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->recv_sequence, base_test_recv_seq_num + 2 );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->code_sequence.value, 2 );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->abi_sequence.value, 0 );
-      const auto& m = res->action_traces[0].receipt->auth_sequence;
+      // reqauth + onfee + doit + onfee + setcode + onfee + setcode + onfee = 8
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->global_sequence, base_global_sequence_num + 8 );
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->recv_sequence, base_test_recv_seq_num + 2 );
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->code_sequence.value, 2 );
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->abi_sequence.value, 0 );
+      const auto& m = res->action_traces[1].receipt->auth_sequence;
       BOOST_CHECK_EQUAL( m.size(), 1 );
       BOOST_CHECK_EQUAL( m.begin()->first.to_string(), "test" );
-      BOOST_CHECK_EQUAL( m.begin()->second, base_test_auth_seq_num + 3 );
+      BOOST_CHECK_EQUAL( m.begin()->second, base_test_auth_seq_num + 5 );
    } );
 
    produce_blocks(1); // Added to avoid the last doit transaction from being considered a duplicate.
@@ -393,14 +405,16 @@ BOOST_FIXTURE_TEST_CASE(action_receipt_tests, TESTER) { try {
 
    call_doit_and_check( config::system_account_name, N(test), [&]( const transaction_trace_ptr& res ) {
       BOOST_CHECK_EQUAL( res->receipt->status, transaction_receipt::executed );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->global_sequence, base_global_sequence_num + 6 );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->recv_sequence, base_system_recv_seq_num + 4 );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->code_sequence.value, base_system_code_seq_num + 1 );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->abi_sequence.value, base_system_abi_seq_num );
-      const auto& m = res->action_traces[0].receipt->auth_sequence;
+      // reqauth + onfee + doit + onfee + setcode + onfee + setcode + onfee + provereset + onfee + onfee(pro blk) = 11
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->global_sequence, base_global_sequence_num + 11 );
+      // doit + onfee + setcode + onfee + setcode + onfee + provereset +　onfee + onfee(pro blk) = 9
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->recv_sequence, base_system_recv_seq_num + 9 );
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->code_sequence.value, base_system_code_seq_num + 1 );
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->abi_sequence.value, base_system_abi_seq_num );
+      const auto& m = res->action_traces[1].receipt->auth_sequence;
       BOOST_CHECK_EQUAL( m.size(), 1 );
       BOOST_CHECK_EQUAL( m.begin()->first.to_string(), "test" );
-      BOOST_CHECK_EQUAL( m.begin()->second, base_test_auth_seq_num + 4 );
+      BOOST_CHECK_EQUAL( m.begin()->second, base_test_auth_seq_num + 7 );
    } );
 
    set_code( config::system_account_name, contracts::eosio_bios_wasm() );
@@ -411,17 +425,22 @@ BOOST_FIXTURE_TEST_CASE(action_receipt_tests, TESTER) { try {
 
    call_doit_and_check( N(test), N(test), [&]( const transaction_trace_ptr& res ) {
       BOOST_CHECK_EQUAL( res->receipt->status, transaction_receipt::executed);
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->global_sequence, base_global_sequence_num + 11 );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->recv_sequence, base_test_recv_seq_num + 3 );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->code_sequence.value, 4 );
-      BOOST_CHECK_EQUAL( res->action_traces[0].receipt->abi_sequence.value, 1 );
-      const auto& m = res->action_traces[0].receipt->auth_sequence;
+      // reqauth + onfee + doit + onfee + setcode + onfee + setcode + onfee + provereset + onfee + onfee(pro blk) +
+      // doit + onfee + setcode + onfee + setcode + onfee + setabi + onfee + setcode + onfee =
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->global_sequence, base_global_sequence_num + 21 );
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->recv_sequence, base_test_recv_seq_num + 3 );
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->code_sequence.value, 4 );
+      BOOST_CHECK_EQUAL( res->action_traces[1].receipt->abi_sequence.value, 1 );
+      const auto& m = res->action_traces[1].receipt->auth_sequence;
       BOOST_CHECK_EQUAL( m.size(), 1 );
       BOOST_CHECK_EQUAL( m.begin()->first.to_string(), "test" );
-      BOOST_CHECK_EQUAL( m.begin()->second, base_test_auth_seq_num + 8 );
+      //
+      BOOST_CHECK_EQUAL( m.begin()->second, base_test_auth_seq_num + 15 );
    } );
 
+   T_LOGI("action_receipt_tests, ok")
 } FC_LOG_AND_RETHROW() }
+
 
 /*************************************************************************************
  * action_tests test case
@@ -594,6 +613,9 @@ BOOST_FIXTURE_TEST_CASE(action_tests, TESTER) { try {
    dummy_action da = { DUMMY_ACTION_DEFAULT_A, DUMMY_ACTION_DEFAULT_B, DUMMY_ACTION_DEFAULT_C };
    CallAction(*this, da);
    BOOST_REQUIRE_EQUAL( validate(), true );
+
+ T_LOGI("action_tests, ok")
+
 } FC_LOG_AND_RETHROW() }
 
 // test require_recipient loop (doesn't cause infinite loop)

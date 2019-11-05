@@ -610,6 +610,20 @@
             ]
         },
         {
+            "name": "producer_key",
+            "base": "",
+            "fields": [
+                {
+                    "name": "producer_name",
+                    "type": "name"
+                },
+                {
+                    "name": "block_signing_key",
+                    "type": "public_key"
+                }
+            ]
+        },
+        {
             "name": "punish_bp_info",
             "base": "",
             "fields": [
@@ -672,6 +686,16 @@
                 {
                     "name": "feature_digest",
                     "type": "checksum256"
+                }
+            ]
+        },
+        {
+            "name": "reqauth",
+            "base": "",
+            "fields": [
+                {
+                    "name": "from",
+                    "type": "name"
                 }
             ]
         },
@@ -836,6 +860,34 @@
             ]
         },
         {
+            "name": "setprods",
+            "base": "",
+            "fields": [
+                {
+                    "name": "schedule",
+                    "type": "producer_key[]"
+                }
+            ]
+        },
+        {
+            "name": "system_config",
+            "base": "",
+            "fields": [
+                {
+                    "name": "config_name",
+                    "type": "name"
+                },
+                {
+                    "name": "number_value",
+                    "type": "uint64"
+                },
+                {
+                    "name": "string_value",
+                    "type": "string"
+                }
+            ]
+        },
+        {
             "name": "transfer",
             "base": "",
             "fields": [
@@ -943,6 +995,24 @@
                 },
                 {
                     "name": "url",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "updateconfig",
+            "base": "",
+            "fields": [
+                {
+                    "name": "config",
+                    "type": "name"
+                },
+                {
+                    "name": "number_value",
+                    "type": "uint64"
+                },
+                {
+                    "name": "string_value",
                     "type": "string"
                 }
             ]
@@ -1175,6 +1245,11 @@
             "ricardian_contract": ""
         },
         {
+            "name": "reqauth",
+            "type": "reqauth",
+            "ricardian_contract": ""
+        },
+        {
             "name": "revote",
             "type": "revote",
             "ricardian_contract": "---\nspec_version: \"0.2.0\"\ntitle: ReVote To Another Block Producer\nsummary: '{{nowrap voter}} change vote from {{nowrap frombp}} to {{nowrap tobp}} with {{nowrap restake}} asset'\n---\n\n{{voter}} change vote from {{frombp}} to {{tobp}} with {{restake}} asset,\n\nIf {{voter}} have not vote to {{tobp}}, {{voter}} will be as the RAM payer of the {{vote_info}}."
@@ -1210,6 +1285,11 @@
             "ricardian_contract": "---\nspec_version: \"0.2.0\"\ntitle: Set Action Fee\nsummary: '{{account}} Set {{nowrap action}} in {{account}} 's contracts Fee {{nowrap fee}}'\n---"
         },
         {
+            "name": "setprods",
+            "type": "setprods",
+            "ricardian_contract": ""
+        },
+        {
             "name": "transfer",
             "type": "transfer",
             "ricardian_contract": "---\nspec_version: \"0.2.0\"\ntitle: Transfer EOS Token\nsummary: 'Send {{nowrap quantity}} EOS Token from {{nowrap from}} to {{nowrap to}}'\n---\n\n{{from}} agrees to send {{quantity}} to {{to}}.\n\n{{#if memo}}There is a memo attached to the transfer stating:\n{{memo}}\n{{/if}}\n\nIf {{from}} is not already the RAM payer of their {{asset_to_symbol_code quantity}} token balance, {{from}} will be designated as such. As a result, RAM will be deducted from {{from}}’s resources to refund the original RAM payer.\n\nIf {{to}} does not have a balance for {{asset_to_symbol_code quantity}}, {{from}} will be designated as the RAM payer of the {{asset_to_symbol_code quantity}} token balance for {{to}}. As a result, RAM will be deducted from {{from}}’s resources to create the necessary records."
@@ -1238,6 +1318,11 @@
             "name": "updatebp",
             "type": "updatebp",
             "ricardian_contract": "---\nspec_version: \"0.2.0\"\ntitle: Update Block Producer Info\nsummary: '{{nowrap bpname}} reg or update their block producer info'\n---\n\nIf {{bpname}} is not a block producer, {{bpname}} will reg to a block producer for eosforce mainnet, and {{bpname}} will be as the RAM payer of the {{bp_info}}.\n\nIf {{bpname}} is a block producer, {{bpname}} update their block producer info with {{block_signing_key}}, {{commission_rate}} and {{url}}."
+        },
+        {
+            "name": "updateconfig",
+            "type": "updateconfig",
+            "ricardian_contract": "---\nspec_version: \"0.2.0\"\ntitle: update system config on eosio.system\nsummary: 'If there is systemconfig, use systemconfig to calculate, otherwise use the default value to calculate'\n---"
         },
         {
             "name": "vote",
@@ -1355,6 +1440,13 @@
         {
             "name": "schedules",
             "type": "schedule_info",
+            "index_type": "i64",
+            "key_names": [],
+            "key_types": []
+        },
+        {
+            "name": "systemconfig",
+            "type": "system_config",
             "index_type": "i64",
             "key_names": [],
             "key_types": []
