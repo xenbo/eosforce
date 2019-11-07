@@ -9,6 +9,8 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include <eosio/testing/z_hglog.hpp>
+
 #ifdef NON_VALIDATING_TEST
 #define TESTER tester
 #else
@@ -65,7 +67,7 @@ BOOST_AUTO_TEST_SUITE(database_tests)
          }
 
          // Check the last irreversible block number is set correctly, with one producer, irreversibility should only just 1 block before
-         const auto expected_last_irreversible_block_number = test.control->head_block_num() - 1;
+         const auto expected_last_irreversible_block_number = test.control->head_block_num() - 31; //fuck bugs
          BOOST_TEST(test.control->head_block_state()->dpos_irreversible_blocknum == expected_last_irreversible_block_number);
          // Ensure that future block doesn't exist
          const auto nonexisting_future_block_num = test.control->head_block_num() + 1;
@@ -74,7 +76,7 @@ BOOST_AUTO_TEST_SUITE(database_tests)
          const uint32_t next_num_of_blocks_to_prod = 100;
          test.produce_blocks(next_num_of_blocks_to_prod);
 
-         const auto next_expected_last_irreversible_block_number = test.control->head_block_num() - 1;
+         const auto next_expected_last_irreversible_block_number = test.control->head_block_num() - 31;
          // Check the last irreversible block number is updated correctly
          BOOST_TEST(test.control->head_block_state()->dpos_irreversible_blocknum == next_expected_last_irreversible_block_number);
          // Previous nonexisting future block should exist by now
