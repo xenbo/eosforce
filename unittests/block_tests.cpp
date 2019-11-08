@@ -25,7 +25,7 @@ BOOST_AUTO_TEST_CASE(block_with_invalid_tx_test)
    auto copy_b = std::make_shared<signed_block>(std::move(*b));
    auto signed_tx = copy_b->transactions.back().trx.get<packed_transaction>().get_signed_transaction();
    auto& act = signed_tx.actions.back();
-   // auto act_data = act.data_as<newaccount>(); 
+   // auto act_data = act.data_as<newaccount>();  //fuck bugs
    // // Make the transaction invalid by having the new account name the same as the creator name
    // act_data.name = act_data.creator;
    // act.data = fc::raw::pack(act_data);
@@ -63,7 +63,8 @@ std::pair<signed_block_ptr, signed_block_ptr> corrupt_trx_in_block(validating_te
    auto signed_tx = packed_trx.get_signed_transaction();
    // Corrupt one signature
    signed_tx.signatures.clear();
-   signed_tx.sign(main.get_private_key(act_name, "active"), main.control->get_chain_id());
+   // signed_tx.sign(main.get_private_key(act_name, "active"), main.control->get_chain_id());
+   signed_tx.sign(main.get_private_key(N(eosforce), "active"), main.control->get_chain_id()); //fuck bugs
 
    // Replace the valid transaction with the invalid transaction
    auto invalid_packed_tx = packed_transaction(signed_tx, packed_trx.get_compression());
@@ -112,7 +113,7 @@ BOOST_AUTO_TEST_CASE(trusted_producer_test)
    }
 
    auto blocks = corrupt_trx_in_block(main, N(tstproducera));
-   // main.validate_push_block( blocks.second );
+   main.validate_push_block( blocks.second );
 }
 
 // like trusted_producer_test, except verify that any entry in the trusted_producer list is accepted
@@ -142,7 +143,7 @@ BOOST_AUTO_TEST_CASE(trusted_producer_verify_2nd_test)
    }
 
    auto blocks = corrupt_trx_in_block(main, N(tstproducera));
-   // main.validate_push_block( blocks.second );
+   main.validate_push_block( blocks.second );
 }
 
 // verify that a block with a transaction with an incorrect signature, is rejected if it is not from a trusted producer
@@ -171,11 +172,11 @@ BOOST_AUTO_TEST_CASE(untrusted_producer_test)
       b = main.produce_block();
    }
 
-   // auto blocks = corrupt_trx_in_block(main, N(tstproducera));
-   // BOOST_REQUIRE_EXCEPTION(main.validate_push_block( blocks.second ), fc::exception ,
-   // [] (const fc::exception &e)->bool {
-   //    return e.code() == unsatisfied_authorization::code_value ;
-   // }) ;
+   auto blocks = corrupt_trx_in_block(main, N(tstproducera));
+//    BOOST_REQUIRE_EXCEPTION(main.validate_push_block( blocks.second ), fc::exception ,
+//    [] (const fc::exception &e)->bool {
+//       return e.code() == unsatisfied_authorization::code_value ;
+//    }) ;
 }
 
 /**

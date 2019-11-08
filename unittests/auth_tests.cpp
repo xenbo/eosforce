@@ -38,19 +38,42 @@ BOOST_FIXTURE_TEST_CASE( missing_sigs, TESTER ) { try {
 } FC_LOG_AND_RETHROW() } /// missing_sigs
 
 BOOST_FIXTURE_TEST_CASE( missing_multi_sigs, TESTER ) { try {
-   //  produce_block();
-   //  create_account(N(alice1), config::system_account_name, true); //, config::system_account_name, true //fuck bugs
-   //  produce_block();
+    produce_block();
+    create_account(N(alice), N(eosforce), true); //, config::system_account_name, true //fuck bugs
+    produce_block();
 
-//{"acc":"eosio","act":"reqauth"}
-   // set_fee(N(eosio),N(reqauth),asset{10000});
-   //  produce_blocks(2);
+// {"acc":"eosio","act":"reqauth"}
+    set_fee(N(eosio),N(reqauth),asset{10000});
+    produce_blocks(2);
 
-   //  BOOST_REQUIRE_THROW(push_reqauth(N(alice), "owner"), unsatisfied_authorization); // without multisig
-   //  auto trace = push_reqauth(N(alice), "owner", true); // with multisig
+    BOOST_REQUIRE_THROW(push_reqauth(N(alice), "owner"), unsatisfied_authorization); // without multisig
 
-   //  produce_block();
-   //  BOOST_REQUIRE_EQUAL(true, chain_has_transaction(trace->id));
+   {
+
+//  auto trace = push_reqauth(N(alice), "owner", true); // with multisig
+   auto keys =  {get_private_key(N(alice), "owner"),get_private_key(N(eosforce), "active")};
+   auto auths = vector<permission_level>{{N(alice), config::owner_name}};
+   variant pretty_trx = fc::mutable_variant_object()
+         ("actions", fc::variants({
+            fc::mutable_variant_object()
+               ("account", name(config::system_account_name))
+               ("name", "reqauth")
+               ("authorization", auths)
+               ("data", fc::mutable_variant_object()
+                  ("from", name(N(alice)))
+               )
+            })
+        );
+
+      signed_transaction trx;
+      abi_serializer::from_variant(pretty_trx, trx, get_resolver(), abi_serializer_max_time);
+      set_transaction_headers(trx);
+      for(auto iter = keys.begin(); iter != keys.end(); iter++)
+         trx.sign( *iter, control->get_chain_id() );
+      auto trace =  push_transaction( trx );
+      produce_block();
+      BOOST_REQUIRE_EQUAL(true, chain_has_transaction(trace->id));
+   }
 
  } FC_LOG_AND_RETHROW() } /// missing_multi_sigs
 
