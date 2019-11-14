@@ -9,6 +9,8 @@
 
 #include "fork_test_utilities.hpp"
 
+#include <eosio/testing/z_hglog.hpp>
+
 #ifdef NON_VALIDATING_TEST
 #define TESTER tester
 #else
@@ -278,6 +280,11 @@ BOOST_FIXTURE_TEST_CASE( producer_schedule_reduction, tester ) try {
       return std::equal( a.begin(), a.end(), b.producers.begin(), b.producers.end() );
    };
 
+// {"acc":"eosio","act":"setprods"}
+
+   set_fee(N(eosio),N(setprods),asset{1000});
+   produce_block();
+
    auto res = set_producers( {N(alice),N(bob),N(carol)} );
    vector<producer_key> sch1 = {
                                  {N(alice), get_public_key(N(alice), "active")},
@@ -286,9 +293,27 @@ BOOST_FIXTURE_TEST_CASE( producer_schedule_reduction, tester ) try {
                                };
    wlog("set producer schedule to [alice,bob,carol]");
    BOOST_REQUIRE_EQUAL( true, control->proposed_producers().valid() );
-   BOOST_CHECK_EQUAL( true, compare_schedules( sch1, *control->proposed_producers() ) );
+
+      const auto &b1 = *control->proposed_producers();
+      for (size_t i = 0; i < sch1.size(); i++) {
+         T_LOGI("\n1:"<<sch1[i].producer_name <<","<<sch1[i].block_signing_key)
+         T_LOGI("\n2:"<<b1.producers[i].producer_name <<","<<b1.producers[i].block_signing_key)
+      }
+      T_LOGI("\n-------------3:"<<control->pending_producers().version)
+
+
+   BOOST_CHECK_EQUAL( true, compare_schedules(sch1, *control->proposed_producers() ) );
    BOOST_CHECK_EQUAL( control->pending_producers().version, 0u );
    produce_block(); // Starts new block which promotes the proposed schedule to pending
+
+      const auto &b2 = *control->proposed_producers();
+      for (size_t i = 0; i < sch1.size(); i++) {
+         T_LOGI("\n1:"<<sch1[i].producer_name <<","<<sch1[i].block_signing_key)
+         T_LOGI("\n2:"<<b2.producers[i].producer_name <<","<<b2.producers[i].block_signing_key)
+      }
+      T_LOGI("\n-------------3:"<<control->pending_producers().version)
+
+
    BOOST_CHECK_EQUAL( control->pending_producers().version, 1u );
    BOOST_CHECK_EQUAL( true, compare_schedules( sch1, control->pending_producers() ) );
    BOOST_CHECK_EQUAL( control->active_producers().version, 0u );
@@ -339,6 +364,9 @@ BOOST_AUTO_TEST_CASE( empty_producer_schedule_has_no_effect ) try {
    auto compare_schedules = [&]( const vector<producer_key>& a, const producer_schedule_type& b ) {
       return std::equal( a.begin(), a.end(), b.producers.begin(), b.producers.end() );
    };
+
+   c.set_fee(N(eosio),N(setprods),asset{1000});
+   c.produce_block();
 
    auto res = c.set_producers( {N(alice),N(bob)} );
    vector<producer_key> sch1 = {
@@ -417,6 +445,11 @@ BOOST_AUTO_TEST_CASE( producer_watermark_test ) try {
       return std::equal( a.begin(), a.end(), b.producers.begin(), b.producers.end() );
    };
 
+
+   c.set_fee(N(eosio),N(setprods),asset{1000});
+   c.produce_block();
+
+
    auto res = c.set_producers( {N(alice),N(bob),N(carol)} );
    vector<producer_key> sch1 = {
                                  {N(alice), c.get_public_key(N(alice), "active")},
@@ -433,6 +466,7 @@ BOOST_AUTO_TEST_CASE( producer_watermark_test ) try {
    BOOST_CHECK_EQUAL( c.control->active_producers().version, 0u );
    c.produce_block();
    c.produce_block(); // Starts new block which promotes the pending schedule to active
+
    BOOST_REQUIRE_EQUAL( c.control->active_producers().version, 1u );
    BOOST_CHECK_EQUAL( true, compare_schedules( sch1, c.control->active_producers() ) );
 
